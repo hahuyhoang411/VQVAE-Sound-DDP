@@ -156,6 +156,30 @@ for i, x in enumerate(gt) :
 
 ## DDP changes
 
+### DDP Wraper
+
+Init Distributed GPU
+```
+def setup(rank, world_size):
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
+
+def cleanup():
+    dist.destroy_process_group()
+
+# Wrap all of the training code into main()
+def main(rank, world_size):
+    setup(rank, world_size)
+    # Training code
+    # ...
+    # ...
+
+if __name__ == "__main__":
+    world_size = torch.cuda.device_count()
+    mp.spawn(main, args=(world_size,), nprocs=world_size, join=True)
+```
+
+### Data Loader
 Old code:
 ```
 for e in range(epochs) :
@@ -195,14 +219,86 @@ for e in range(epochs) :
     iters = len(trn_loader)
 ```
 
+Old code:
+```
+def restore(path, model):
+    model.load_state_dict(torch.load(path))
+
+    match = re.search(r'_([0-9]+)\.pyt', path)
+    if match:
+        return int(match.group(1))
+
+    step_path = re.sub(r'\.pyt', '_step.npy', path)
+    return np.load(step_path)
+```
+
+New code:
+
+```
+# Handle the case where the model is wrapped with DDP
+def restore(path, model):
+    state_dict = torch.load(path)
+
+    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
+        state_dict = {f'module.{k}': v for k, v in state_dict.items()}
+
+    model.load_state_dict(state_dict)
+
+    match = re.search(r'_([0-9]+)\.pyt', path)
+    if match:
+        return int(match.group(1))
+
+    step_path = re.sub(r'\.pyt', '_step.npy', path)
+    return np.load(step_path)
+```
+
+Old code:
+```
+class MultispeakerDataset(Dataset):
+    def __init__(self, index, path):
+        self.path = path
+        self.index = index
+        self.all_files = [(i, name) for (i, speaker) in enumerate(index) for name in speaker]
+
+    def __getitem__(self, index):
+        speaker_id, name = self.all_files[index]
+        speaker_onehot = (np.arange(len(self.index)) == speaker_id).astype(np.long)
+        audio = np.load(f'{self.path}/{speaker_id}/{name}.npy')
+        return speaker_onehot, audio
+
+    def __len__(self):
+        return len(self.all_files)
+
+    def num_speakers(self):
+        return len(self.index)
+```
+
+New code:
+```
+# Change np.long to np._int since long is outdated 
+class MultispeakerDataset(Dataset):
+    def __init__(self, index, path):
+        self.path = path
+        self.index = index
+        self.all_files = [(i, name) for (i, speaker) in enumerate(index) for name in speaker]
+
+    def __getitem__(self, index):
+        speaker_id, name = self.all_files[index]
+        speaker_onehot = (np.arange(len(self.index)) == speaker_id).astype(np.int_)
+        audio = np.load(f'{self.path}/{speaker_id}/{name}.npy')
+        return speaker_onehot, audio
+
+    def __len__(self):
+        return len(self.all_files)
+
+    def num_speakers(self):
+        return len(self.index)
+```
 
 ## Bf16 changes
 
-## forward_generate Function
-
-| Old Code | New Code |
-|----------|----------|
-| ```python
+Old code:
+```
 def forward_generate(self, global_decoder_cond, samples, deterministic=False, use_half=False, verbose=False):
     if use_half:
         samples = samples.half()
@@ -218,7 +314,10 @@ def forward_generate(self, global_decoder_cond, samples, deterministic=False, us
         output = self.overtone.generate(discrete.squeeze(2), global_decoder_cond, use_half=use_half, verbose=verbose)
     self.train()
     return output
-``` | ```python
+```
+
+New code:
+```
 def forward_generate(self, global_decoder_cond, samples, deterministic=False, use_half=False, verbose=False):
     if use_half:
         samples = samples.to(dtype=torch.bfloat16) # New add for bf16
@@ -235,35 +334,35 @@ def forward_generate(self, global_decoder_cond, samples, deterministic=False, us
         output = self.overtone.generate(discrete.squeeze(2), global_decoder_cond, use_half=use_half, verbose=verbose)
     self.train()
     return output
-``` |
+```
 
-## Optimizer Handling
-
-| Old Code | New Code |
-|----------|----------|
-| ```python
+Old code:
+```
 if use_half:
     import apex
     optimiser = apex.fp16_utils.FP16_Optimizer(optimiser, dynamic_loss_scale=True)
-``` | ```python
+```
+
+New code:
+```
 if use_half:
     import apex
     optimiser = optimiser # Use direct optimizer
-``` |
+```
 
-## Loss Calculation
-
-| Old Code | New Code |
-|----------|----------|
-| ```python
+Old code:
+```
 p_cf, vq_pen, encoder_pen, entropy = self(speaker, x, translated)
 p_c, p_f = p_cf
 loss_c = criterion(p_c.transpose(1, 2).float(), y_coarse)
 loss_f = criterion(p_f.transpose(1, 2).float(), y_fine)
-``` | ```python
+```
+
+New code:
+```
 # Long format requirement
 p_cf, vq_pen, encoder_pen, entropy = self(speaker, x, translated)
 p_c, p_f = p_cf
 loss_c = criterion(p_c.transpose(1, 2).float(), y_coarse.long())
 loss_f = criterion(p_f.transpose(1, 2).float(), y_fine.long())
-``` |
+```
