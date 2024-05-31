@@ -297,59 +297,6 @@ class MultispeakerDataset(Dataset):
 
 ## Bf16 changes
 
-Old code:
-```
-def forward_generate(self, global_decoder_cond, samples, deterministic=False, use_half=False, verbose=False):
-    if use_half:
-        samples = samples.half()
-    # samples: (L)
-    #logger.log(f'samples: {samples.size()}')
-    self.eval()
-    with torch.no_grad() :
-        continuous = self.encoder(samples)
-        discrete, vq_pen, encoder_pen, entropy = self.vq(continuous.unsqueeze(2))
-        logger.log(f'entropy: {entropy}')
-        # cond: (1, L1, 64)
-        #logger.log(f'cond: {cond.size()}')
-        output = self.overtone.generate(discrete.squeeze(2), global_decoder_cond, use_half=use_half, verbose=verbose)
-    self.train()
-    return output
-```
-
-New code:
-```
-def forward_generate(self, global_decoder_cond, samples, deterministic=False, use_half=False, verbose=False):
-    if use_half:
-        samples = samples.to(dtype=torch.bfloat16) # New add for bf16
-    # samples: (L)
-    #logger.log(f'samples: {samples.size()}')
-    self.eval()
-    with torch.no_grad() :
-        samples = samples.to(dtype=torch.bfloat16) # New add for bf16
-        continuous = self.encoder(samples)
-        discrete, vq_pen, encoder_pen, entropy = self.vq(continuous.unsqueeze(2))
-        logger.log(f'entropy: {entropy}')
-        # cond: (1, L1, 64)
-        #logger.log(f'cond: {cond.size()}')
-        output = self.overtone.generate(discrete.squeeze(2), global_decoder_cond, use_half=use_half, verbose=verbose)
-    self.train()
-    return output
-```
-
-Old code:
-```
-if use_half:
-    import apex
-    optimiser = apex.fp16_utils.FP16_Optimizer(optimiser, dynamic_loss_scale=True)
-```
-
-New code:
-```
-if use_half:
-    import apex
-    optimiser = optimiser # Use direct optimizer
-```
-
 <table>
 <tr>
 <th>Old Code</th>
@@ -375,3 +322,66 @@ loss_c = criterion(p_c.transpose(1, 2).float(), y_coarse.long())
 loss_f = criterion(p_f.transpose(1, 2).float(), y_fine.long())
 ```
 </td>
+</tr>
+<tr>
+<td>
+
+```python
+def forward_generate(self, global_decoder_cond, samples, deterministic=False, use_half=False, verbose=False):
+    if use_half:
+        samples = samples.half()
+    # samples: (L)
+    #logger.log(f'samples: {samples.size()}')
+    self.eval()
+    with torch.no_grad() :
+        continuous = self.encoder(samples)
+        discrete, vq_pen, encoder_pen, entropy = self.vq(continuous.unsqueeze(2))
+        logger.log(f'entropy: {entropy}')
+        # cond: (1, L1, 64)
+        #logger.log(f'cond: {cond.size()}')
+        output = self.overtone.generate(discrete.squeeze(2), global_decoder_cond, use_half=use_half, verbose=verbose)
+    self.train()
+    return output
+```
+</td>
+<td>
+
+```python
+def forward_generate(self, global_decoder_cond, samples, deterministic=False, use_half=False, verbose=False):
+    if use_half:
+        samples = samples.to(dtype=torch.bfloat16) # New add for bf16
+    # samples: (L)
+    #logger.log(f'samples: {samples.size()}')
+    self.eval()
+    with torch.no_grad() :
+        samples = samples.to(dtype=torch.bfloat16) # New add for bf16
+        continuous = self.encoder(samples)
+        discrete, vq_pen, encoder_pen, entropy = self.vq(continuous.unsqueeze(2))
+        logger.log(f'entropy: {entropy}')
+        # cond: (1, L1, 64)
+        #logger.log(f'cond: {cond.size()}')
+        output = self.overtone.generate(discrete.squeeze(2), global_decoder_cond, use_half=use_half, verbose=verbose)
+    self.train()
+    return output
+```
+</td>
+</tr>
+<tr>
+<td>
+
+```python
+if use_half:
+    import apex
+    optimiser = apex.fp16_utils.FP16_Optimizer(optimiser, dynamic_loss_scale=True)
+```
+</td>
+<td>
+
+```python
+if use_half:
+    import apex
+    optimiser = optimiser # Use direct optimizer
+```
+</td>
+</tr>
+</table>
