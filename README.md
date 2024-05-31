@@ -218,7 +218,12 @@ For loading data, I `partial` to share data accross GPUs.
 
 ```python
 for e in range(epochs) :
-    trn_loader = DataLoader(dataset, collate_fn=lambda batch: env.collate_multispeaker_samples(pad_left, window, pad_right, batch),                      
+    trn_loader = DataLoader(dataset,
+    collate_fn=lambda batch: env.collate_multispeaker_samples(pad_left,
+                                                              window,
+                                                              pad_right,
+                                                              batch
+                                                            ),                      
                             batch_size=batch_size,
                             num_workers=2,
                             shuffle=True,
