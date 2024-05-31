@@ -181,7 +181,10 @@ For simple DDP usage, I wrap the init model in `DDP()` and wrap all of the train
 ```python
 # Init Distributed GPU
 def setup(rank, world_size):
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    dist.init_process_group("nccl",
+                            rank=rank,
+                            world_size=world_size
+                          )
     torch.cuda.set_device(rank)
 
 def cleanup():
@@ -215,8 +218,12 @@ For loading data, I `partial` to share data accross GPUs.
 
 ```python
 for e in range(epochs) :
-    trn_loader = DataLoader(dataset, collate_fn=lambda batch: env.collate_multispeaker_samples(pad_left, window, pad_right, batch), batch_size=batch_size,
-                            num_workers=2, shuffle=True, pin_memory=True)
+    trn_loader = DataLoader(dataset, collate_fn=lambda batch: env.collate_multispeaker_samples(pad_left, window, pad_right, batch),                      
+                            batch_size=batch_size,
+                            num_workers=2,
+                            shuffle=True,
+                            pin_memory=True
+                          )
 
     start = time.time()
     running_loss_c = 0.
@@ -235,9 +242,19 @@ for e in range(epochs) :
 ```python
 # Convert to partial so can split to multiple GPU
 for e in range(epochs) :
-    collate_fn_with_padding = partial(env.collate_multispeaker_samples, pad_left, window, pad_right)
-    trn_loader = DataLoader(dataset, collate_fn=collate_fn_with_padding, batch_size=batch_size,
-                            num_workers=8, shuffle=False, pin_memory=True, sampler=DistributedSampler(dataset))
+    collate_fn_with_padding = partial(env.collate_multispeaker_samples,
+                                      pad_left,
+                                      window,
+                                      pad_right
+                                    )
+    trn_loader = DataLoader(dataset,
+                            collate_fn=collate_fn_with_padding,
+                            batch_size=batch_size,
+                            num_workers=8,
+                            shuffle=False,
+                            pin_memory=True,
+                            sampler=DistributedSampler(dataset)
+                          )
 
     start = time.time()
     running_loss_c = 0.
