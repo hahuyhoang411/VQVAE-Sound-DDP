@@ -198,8 +198,11 @@ for e in range(epochs) :
 
 ## Bf16 changes
 
-Old code:
-```
+## forward_generate Function
+
+| Old Code | New Code |
+|----------|----------|
+| ```python
 def forward_generate(self, global_decoder_cond, samples, deterministic=False, use_half=False, verbose=False):
     if use_half:
         samples = samples.half()
@@ -215,10 +218,7 @@ def forward_generate(self, global_decoder_cond, samples, deterministic=False, us
         output = self.overtone.generate(discrete.squeeze(2), global_decoder_cond, use_half=use_half, verbose=verbose)
     self.train()
     return output
-```
-
-New code:
-```
+``` | ```python
 def forward_generate(self, global_decoder_cond, samples, deterministic=False, use_half=False, verbose=False):
     if use_half:
         samples = samples.to(dtype=torch.bfloat16) # New add for bf16
@@ -235,35 +235,35 @@ def forward_generate(self, global_decoder_cond, samples, deterministic=False, us
         output = self.overtone.generate(discrete.squeeze(2), global_decoder_cond, use_half=use_half, verbose=verbose)
     self.train()
     return output
-```
+``` |
 
-Old code:
-```
+## Optimizer Handling
+
+| Old Code | New Code |
+|----------|----------|
+| ```python
 if use_half:
     import apex
     optimiser = apex.fp16_utils.FP16_Optimizer(optimiser, dynamic_loss_scale=True)
-```
-
-New code:
-```
+``` | ```python
 if use_half:
     import apex
     optimiser = optimiser # Use direct optimizer
-```
+``` |
 
-Old code:
-```
+## Loss Calculation
+
+| Old Code | New Code |
+|----------|----------|
+| ```python
 p_cf, vq_pen, encoder_pen, entropy = self(speaker, x, translated)
 p_c, p_f = p_cf
 loss_c = criterion(p_c.transpose(1, 2).float(), y_coarse)
 loss_f = criterion(p_f.transpose(1, 2).float(), y_fine)
-```
-
-New code:
-```
+``` | ```python
 # Long format requirement
 p_cf, vq_pen, encoder_pen, entropy = self(speaker, x, translated)
 p_c, p_f = p_cf
 loss_c = criterion(p_c.transpose(1, 2).float(), y_coarse.long())
 loss_f = criterion(p_f.transpose(1, 2).float(), y_fine.long())
-```
+``` |
