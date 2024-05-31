@@ -366,6 +366,7 @@ loss_f = criterion(p_f.transpose(1, 2).float(), y_fine)
 ```
 </td>
 <td>
+
 ```python
 # Long format requirement
 p_cf, vq_pen, encoder_pen, entropy = self(speaker, x, translated)
