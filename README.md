@@ -350,16 +350,21 @@ if use_half:
     optimiser = optimiser # Use direct optimizer
 ```
 
-Old code:
-```
+<table>
+<tr>
+<th>Old Code</th>
+<th>New Code</th>
+</tr>
+<tr>
+<td>
+
+```python
 p_cf, vq_pen, encoder_pen, entropy = self(speaker, x, translated)
 p_c, p_f = p_cf
 loss_c = criterion(p_c.transpose(1, 2).float(), y_coarse)
 loss_f = criterion(p_f.transpose(1, 2).float(), y_fine)
 ```
-
-New code:
-```
+```python
 # Long format requirement
 p_cf, vq_pen, encoder_pen, entropy = self(speaker, x, translated)
 p_c, p_f = p_cf
