@@ -130,4 +130,140 @@ connect layers with the same operating frequency.
 
 The code is based on [fatchord/WaveRNN](https://github.com/fatchord/WaveRNN).
 
-# DDP Code change
+# Code change
+
+## Write output
+Old code:
+```
+for i, x in enumerate(gt) :
+    librosa.output.write_wav(f'{paths.gen_path()}/{k}k_steps_{i}_target.wav', x.cpu().numpy(), sr=sample_rate)
+    audio = out[i][:len(x)].cpu().numpy()
+    librosa.output.write_wav(f'{paths.gen_path()}/{k}k_steps_{i}_generated.wav', audio, sr=sample_rate)
+    audio_tr = out[n_points+i][:len(x)].cpu().numpy()
+    librosa.output.write_wav(f'{paths.gen_path()}/{k}k_steps_{i}_transferred.wav', audio_tr, sr=sample_rate)
+```
+
+New code:
+```
+# librosa is outdated
+for i, x in enumerate(gt) :
+    sf.write(f'{paths.gen_path()}/{k}k_steps_{i}_target.wav', x.cpu().numpy(), samplerate=sample_rate)
+    audio = out[i][:len(x)].cpu().numpy()
+    sf.write(f'{paths.gen_path()}/{k}k_steps_{i}_generated.wav', audio, samplerate=sample_rate)
+    audio_tr = out[n_points+i][:len(x)].cpu().numpy()
+    sf.write(f'{paths.gen_path()}/{k}k_steps_{i}_transferred.wav', audio_tr, samplerate=sample_rate)
+```
+
+## DDP changes
+
+Old code:
+```
+for e in range(epochs) :
+
+    trn_loader = DataLoader(dataset, collate_fn=lambda batch: env.collate_multispeaker_samples(pad_left, window, pad_right, batch), batch_size=batch_size,
+                            num_workers=2, shuffle=True, pin_memory=True)
+
+    start = time.time()
+    running_loss_c = 0.
+    running_loss_f = 0.
+    running_loss_vq = 0.
+    running_loss_vqc = 0.
+    running_entropy = 0.
+    running_max_grad = 0.
+    running_max_grad_name = ""
+
+    iters = len(trn_loader)
+```
+
+New code:
+```
+# Convert to partial so can split to multiple GPU
+for e in range(epochs) :
+    collate_fn_with_padding = partial(env.collate_multispeaker_samples, pad_left, window, pad_right)
+    trn_loader = DataLoader(dataset, collate_fn=collate_fn_with_padding, batch_size=batch_size,
+                            num_workers=8, shuffle=False, pin_memory=True, sampler=DistributedSampler(dataset))
+
+    start = time.time()
+    running_loss_c = 0.
+    running_loss_f = 0.
+    running_loss_vq = 0.
+    running_loss_vqc = 0.
+    running_entropy = 0.
+    running_max_grad = 0.
+    running_max_grad_name = ""
+
+    iters = len(trn_loader)
+```
+
+
+## Bf16 changes
+
+Old code:
+```
+def forward_generate(self, global_decoder_cond, samples, deterministic=False, use_half=False, verbose=False):
+    if use_half:
+        samples = samples.half()
+    # samples: (L)
+    #logger.log(f'samples: {samples.size()}')
+    self.eval()
+    with torch.no_grad() :
+        continuous = self.encoder(samples)
+        discrete, vq_pen, encoder_pen, entropy = self.vq(continuous.unsqueeze(2))
+        logger.log(f'entropy: {entropy}')
+        # cond: (1, L1, 64)
+        #logger.log(f'cond: {cond.size()}')
+        output = self.overtone.generate(discrete.squeeze(2), global_decoder_cond, use_half=use_half, verbose=verbose)
+    self.train()
+    return output
+```
+
+New code:
+```
+def forward_generate(self, global_decoder_cond, samples, deterministic=False, use_half=False, verbose=False):
+    if use_half:
+        samples = samples.to(dtype=torch.bfloat16) # New add for bf16
+    # samples: (L)
+    #logger.log(f'samples: {samples.size()}')
+    self.eval()
+    with torch.no_grad() :
+        samples = samples.to(dtype=torch.bfloat16) # New add for bf16
+        continuous = self.encoder(samples)
+        discrete, vq_pen, encoder_pen, entropy = self.vq(continuous.unsqueeze(2))
+        logger.log(f'entropy: {entropy}')
+        # cond: (1, L1, 64)
+        #logger.log(f'cond: {cond.size()}')
+        output = self.overtone.generate(discrete.squeeze(2), global_decoder_cond, use_half=use_half, verbose=verbose)
+    self.train()
+    return output
+```
+
+Old code:
+```
+if use_half:
+    import apex
+    optimiser = apex.fp16_utils.FP16_Optimizer(optimiser, dynamic_loss_scale=True)
+```
+
+New code:
+```
+if use_half:
+    import apex
+    optimiser = optimiser # Use direct optimizer
+```
+
+Old code:
+```
+p_cf, vq_pen, encoder_pen, entropy = self(speaker, x, translated)
+p_c, p_f = p_cf
+loss_c = criterion(p_c.transpose(1, 2).float(), y_coarse)
+loss_f = criterion(p_f.transpose(1, 2).float(), y_fine)
+```
+
+New code:
+```
+# Long format requirement
+p_cf, vq_pen, encoder_pen, entropy = self(speaker, x, translated)
+p_c, p_f = p_cf
+loss_c = criterion(p_c.transpose(1, 2).float(), y_coarse.long())
+loss_f = criterion(p_f.transpose(1, 2).float(), y_fine.long())
+```
