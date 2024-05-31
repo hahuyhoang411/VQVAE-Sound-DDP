@@ -180,10 +180,17 @@ if __name__ == "__main__":
 ```
 
 ### Data Loader
-Old code:
-```
-for e in range(epochs) :
 
+<table>
+<tr>
+<th>Old Code</th>
+<th>New Code</th>
+</tr>
+<tr>
+<td>
+
+```python
+for e in range(epochs) :
     trn_loader = DataLoader(dataset, collate_fn=lambda batch: env.collate_multispeaker_samples(pad_left, window, pad_right, batch), batch_size=batch_size,
                             num_workers=2, shuffle=True, pin_memory=True)
 
@@ -198,9 +205,10 @@ for e in range(epochs) :
 
     iters = len(trn_loader)
 ```
+</td>
+<td>
 
-New code:
-```
+```python
 # Convert to partial so can split to multiple GPU
 for e in range(epochs) :
     collate_fn_with_padding = partial(env.collate_multispeaker_samples, pad_left, window, pad_right)
@@ -218,9 +226,12 @@ for e in range(epochs) :
 
     iters = len(trn_loader)
 ```
+</td>
+</tr>
+<tr>
+<td>
 
-Old code:
-```
+```python
 def restore(path, model):
     model.load_state_dict(torch.load(path))
 
@@ -231,10 +242,10 @@ def restore(path, model):
     step_path = re.sub(r'\.pyt', '_step.npy', path)
     return np.load(step_path)
 ```
+</td>
+<td>
 
-New code:
-
-```
+```python
 # Handle the case where the model is wrapped with DDP
 def restore(path, model):
     state_dict = torch.load(path)
@@ -251,9 +262,12 @@ def restore(path, model):
     step_path = re.sub(r'\.pyt', '_step.npy', path)
     return np.load(step_path)
 ```
+</td>
+</tr>
+<tr>
+<td>
 
-Old code:
-```
+```python
 class MultispeakerDataset(Dataset):
     def __init__(self, index, path):
         self.path = path
@@ -272,10 +286,11 @@ class MultispeakerDataset(Dataset):
     def num_speakers(self):
         return len(self.index)
 ```
+</td>
+<td>
 
-New code:
 ```
-# Change np.long to np._int since long is outdated 
+# Change np.long to np.int_ since long is outdated 
 class MultispeakerDataset(Dataset):
     def __init__(self, index, path):
         self.path = path
@@ -294,6 +309,9 @@ class MultispeakerDataset(Dataset):
     def num_speakers(self):
         return len(self.index)
 ```
+</td>
+</tr>
+</table>
 
 ## Bf16 changes
 
