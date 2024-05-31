@@ -133,6 +133,11 @@ The code is based on [fatchord/WaveRNN](https://github.com/fatchord/WaveRNN).
 # Code change
 
 ## Write output
+
+I change to `soundfile` because `librosa` is outdated
+
+`vqvae.py`
+
 <table>
 <tr>
 <th>Old Code</th>
@@ -169,6 +174,10 @@ for i, x in enumerate(gt) :
 
 ### DDP Wraper
 
+For simple DDP usage, I wrap the init model in `DDP()` and wrap all of the training inside `main()` to distributed in 4 GPUs
+
+`multi_wavernn.py`
+
 ```python
 # Init Distributed GPU
 def setup(rank, world_size):
@@ -191,6 +200,10 @@ if __name__ == "__main__":
 ```
 
 ### Data Loader
+
+For loading data, I `partial` to share data accross GPUs.
+
+`env.py`
 
 <table>
 <tr>
