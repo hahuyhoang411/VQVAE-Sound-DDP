@@ -129,3 +129,5 @@ connect layers with the same operating frequency.
 # Acknowledgement
 
 The code is based on [fatchord/WaveRNN](https://github.com/fatchord/WaveRNN).
+
+# DDP Code change
