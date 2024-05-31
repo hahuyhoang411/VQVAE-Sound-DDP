@@ -1,2 +1,8 @@
-__pycache__/
-/config.py
+data/
+data_processed/
+log/
+model_checkpoints/
+model_outputs/
+vq-vae-sound/
+VQVAE/
+snapshot.pt
