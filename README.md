@@ -133,8 +133,15 @@ The code is based on [fatchord/WaveRNN](https://github.com/fatchord/WaveRNN).
 # Code change
 
 ## Write output
-Old code:
-```
+<table>
+<tr>
+<th>Old Code</th>
+<th>New Code</th>
+</tr>
+<tr>
+<td>
+
+```python
 for i, x in enumerate(gt) :
     librosa.output.write_wav(f'{paths.gen_path()}/{k}k_steps_{i}_target.wav', x.cpu().numpy(), sr=sample_rate)
     audio = out[i][:len(x)].cpu().numpy()
@@ -142,9 +149,10 @@ for i, x in enumerate(gt) :
     audio_tr = out[n_points+i][:len(x)].cpu().numpy()
     librosa.output.write_wav(f'{paths.gen_path()}/{k}k_steps_{i}_transferred.wav', audio_tr, sr=sample_rate)
 ```
+</td>
+<td>
 
-New code:
-```
+```python
 # librosa is outdated
 for i, x in enumerate(gt) :
     sf.write(f'{paths.gen_path()}/{k}k_steps_{i}_target.wav', x.cpu().numpy(), samplerate=sample_rate)
@@ -153,13 +161,16 @@ for i, x in enumerate(gt) :
     audio_tr = out[n_points+i][:len(x)].cpu().numpy()
     sf.write(f'{paths.gen_path()}/{k}k_steps_{i}_transferred.wav', audio_tr, samplerate=sample_rate)
 ```
+</td>
+</tr>
+</table>
 
 ## DDP changes
 
 ### DDP Wraper
 
-Init Distributed GPU
-```
+```python
+# Init Distributed GPU
 def setup(rank, world_size):
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
     torch.cuda.set_device(rank)
